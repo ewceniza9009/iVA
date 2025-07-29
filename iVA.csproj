@@ -21,19 +21,26 @@
     <PackageReference Include="Tesseract" Version="5.2.0" />
   </ItemGroup>
 	
-	<ItemGroup>
-		<Content Include="tessdata\**">
-			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-		</Content>
-	</ItemGroup>
-
   <ItemGroup>
-    <None Include="wwwroot\app.js" />
-    <None Include="wwwroot\index.html" />
+	<Content Include="tessdata\**">
+		<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+	</Content>
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="logs\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Update="tessdata\eng.traineddata">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="nets\object_detector.onnx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

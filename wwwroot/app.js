@@ -424,12 +424,11 @@
     videoFilePauseBtn.addEventListener('click', stopProcessing);
 
 
-    async function initialize() {
-        const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        applyTheme(savedTheme);                                 
+    async function initialize() {                              
         await fetchAndRenderLogs();
 
         liveCameraTabBtn.click();
+
         initializeCamera();
     }
 
