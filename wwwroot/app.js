@@ -34,12 +34,24 @@
     const applyTheme = (theme) => {
         if (theme === 'dark') {
             document.documentElement.classList.add('dark');
+            document.documentElement.classList.remove('light');
             lightIcon.classList.add('hidden');
             darkIcon.classList.remove('hidden');
         } else {
             document.documentElement.classList.remove('dark');
+            document.documentElement.classList.add('light');
             darkIcon.classList.add('hidden');
             lightIcon.classList.remove('hidden');
+        }
+
+        if (activeTab === 'camera') {
+            updateTabButtonStyles(liveCameraTabBtn, videoFileTabBtn, theme);
+        } else {             
+            updateTabButtonStyles(videoFileTabBtn, liveCameraTabBtn, theme);
+        }
+
+        if (currentActiveCanvas) {
+            currentActiveCanvas.getContext('2d').clearRect(0, 0, currentActiveCanvas.width, currentActiveCanvas.height);
         }
     };
 
@@ -63,7 +75,11 @@
         detections.forEach(det => {
             const { x, y, width, height } = det.boundingBox;
             const isDark = document.documentElement.classList.contains('dark');
-            ctx.strokeStyle = isDark ? '#22d3ee' : '#0891b2';
+            const strokeColor = isDark ? '#2dd4bf' : '#0d9488';                         
+            const fillColor = isDark ? '#2dd4bf' : '#0d9488';                         
+            const textColor = '#ffffff';                                 
+
+            ctx.strokeStyle = strokeColor;
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, width, height);
 
@@ -71,9 +87,9 @@
             ctx.font = "14px Inter, sans-serif";
             const textWidth = ctx.measureText(text).width;
 
-            ctx.fillStyle = isDark ? '#22d3ee' : '#0891b2';
+            ctx.fillStyle = fillColor;
             ctx.fillRect(x, y - 20, textWidth + 10, 20);
-            ctx.fillStyle = isDark ? '#0f172a' : '#ffffff';
+            ctx.fillStyle = textColor;
             ctx.fillText(text, x + 5, y - 5);
         });
     }
@@ -147,14 +163,15 @@
                 .map(([className, count]) => `${count} ${className}${count > 1 ? 's' : ''}`)
                 .join(', ');
         }
+
         return `
-        <div class="p-4 rounded-lg bg-white/50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 animate-fade-in" data-log-id="${log.id}">
-            <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">${timestamp}</p>
-            <p class="mb-3 text-sm">${descriptionHtml}</p> <details class="text-xs">
-                <summary class="cursor-pointer text-cyan-600 dark:text-cyan-400">Details</summary>
-                <div class="mt-2 pt-2 border-t border-slate-300 dark:border-slate-600 space-y-1">
-                    <p><strong class="font-medium">Objects:</strong> ${formattedObjects}</p>
-                    <p><strong class="font-medium">Text:</strong> ${text}</p>
+        <div class="p-4 rounded-lg animate-fade-in glass-panel bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700" data-log-id="${log.id}">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${timestamp}</p>
+            <p class="mb-3 text-sm text-gray-800 dark:text-gray-200">${descriptionHtml}</p> <details class="text-xs">
+                <summary class="cursor-pointer text-teal-600 dark:text-teal-400">Details</summary>
+                <div class="mt-2 pt-2 border-t border-gray-300 dark:border-slate-600 space-y-1">
+                    <p><strong class="font-medium text-gray-800 dark:text-gray-200">Objects:</strong> ${formattedObjects}</p>
+                    <p><strong class="font-medium text-gray-800 dark:text-gray-200">Text:</strong> ${text}</p>
                 </div>
             </details>
         </div>
@@ -168,7 +185,7 @@
             const logs = await response.json();
 
             if (!logs || logs.length === 0) {
-                logsContainer.innerHTML = '<p class="text-center text-slate-500 text-sm">History will appear here once processing starts.</p>';
+                logsContainer.innerHTML = '<p class="text-center text-gray-600 dark:text-gray-500">History will appear here once processing starts.</p>';
                 return;
             }
 
@@ -344,16 +361,37 @@
         }
     });
 
+    function updateTabButtonStyles(activeBtn, inactiveBtn, currentTheme) {
+        [activeBtn, inactiveBtn].forEach(btn => {
+            btn.classList.remove('bg-teal-500', 'text-white', 'shadow-md',
+                'bg-teal-600',             
+                'text-gray-700', 'hover:bg-teal-50',
+                'text-gray-300', 'hover:bg-slate-700');
+        });
+
+        activeBtn.classList.add('bg-teal-500', 'text-white', 'shadow-md');
+        if (currentTheme === 'dark') {
+            activeBtn.classList.remove('bg-teal-500');                 
+            activeBtn.classList.add('bg-teal-600');                         
+        }
+
+        inactiveBtn.classList.add('text-gray-700', 'hover:bg-teal-50');
+        if (currentTheme === 'dark') {
+            inactiveBtn.classList.remove('text-gray-700', 'hover:bg-teal-50');                 
+            inactiveBtn.classList.add('text-gray-300', 'hover:bg-slate-700');             
+        }
+    }
+
+
     liveCameraTabBtn.addEventListener('click', () => {
         if (activeTab === 'camera') return;
         stopProcessing();             
         stopAllVideoSources();             
         liveCameraContent.classList.remove('hidden');
         videoFileContent.classList.add('hidden');
-        liveCameraTabBtn.classList.add('text-cyan-600', 'border-b-2', 'border-cyan-600', 'dark:text-cyan-400', 'dark:border-cyan-400');
-        liveCameraTabBtn.classList.remove('text-slate-500', 'hover:text-cyan-600', 'dark:text-slate-400', 'hover:dark:text-cyan-400', 'border-transparent');
-        videoFileTabBtn.classList.add('text-slate-500', 'hover:text-cyan-600', 'dark:text-slate-400', 'hover:dark:text-cyan-400', 'border-b-2', 'border-transparent');
-        videoFileTabBtn.classList.remove('text-cyan-600', 'border-cyan-600', 'dark:text-cyan-400', 'dark:border-cyan-400');
+
+        updateTabButtonStyles(liveCameraTabBtn, videoFileTabBtn, localStorage.getItem('theme') || 'light');
+
         initializeCamera();                     
         objectsEl.textContent = 'Ready for camera feed.';
         textEl.textContent = 'Ready for camera feed.';
@@ -365,10 +403,9 @@
         stopAllVideoSources();             
         videoFileContent.classList.remove('hidden');
         liveCameraContent.classList.add('hidden');
-        videoFileTabBtn.classList.add('text-cyan-600', 'border-b-2', 'border-cyan-600', 'dark:text-cyan-400', 'dark:border-cyan-400');
-        videoFileTabBtn.classList.remove('text-slate-500', 'hover:text-cyan-600', 'dark:text-slate-400', 'hover:dark:text-cyan-400', 'border-transparent');
-        liveCameraTabBtn.classList.add('text-slate-500', 'hover:text-cyan-600', 'dark:text-slate-400', 'hover:dark:text-cyan-400', 'border-b-2', 'border-transparent');
-        liveCameraTabBtn.classList.remove('text-cyan-600', 'border-cyan-600', 'dark:text-cyan-400', 'dark:border-cyan-400');
+
+        updateTabButtonStyles(videoFileTabBtn, liveCameraTabBtn, localStorage.getItem('theme') || 'light');
+
         prepareVideoFile();                             
         objectsEl.textContent = 'Select a video file.';
         textEl.textContent = 'Select a video file.';
@@ -382,7 +419,7 @@
 
     async function initialize() {
         const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        applyTheme(savedTheme);
+        applyTheme(savedTheme);                                 
         await fetchAndRenderLogs();
 
         liveCameraTabBtn.click();                                         
