@@ -6,20 +6,18 @@ namespace iVA.Services
     public class LogFileWriterService
     {
         private readonly string _logFilePath;
-        private static readonly object _fileLock = new object();
-
         public LogFileWriterService(IWebHostEnvironment env)
         {
             var logDir = Path.Combine(env.ContentRootPath, "logs");
             Directory.CreateDirectory(logDir);
-            _logFilePath = Path.Combine(logDir, "iva_temporary.log");
+            _logFilePath = Path.Combine(logDir, "iva.log");
         }
 
         public Task WriteLogAsync(DetectionLog log)
         {
             var jsonLog = JsonSerializer.Serialize(log);
 
-            lock (_fileLock)
+            lock (SharedLocks.LogFileLock)
             {
                 File.AppendAllText(_logFilePath, jsonLog + Environment.NewLine);
             }

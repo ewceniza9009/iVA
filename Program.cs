@@ -60,3 +60,8 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+public static class SharedLocks
+{
+    public static readonly object LogFileLock = new object();
+}

@@ -51,7 +51,8 @@ namespace iVA.Controllers
                 ObjectsDetected = string.Join(", ", detections.Select(d => d.ClassName)),
                 ObjectCount = detections.Count,
                 ExtractedText = extractedText,
-                SceneDescription = null        
+                SceneDescription = null,
+                ImageBase64 = frameData.ImageBase64       
             };
 
             await _logWriter.WriteLogAsync(log);
