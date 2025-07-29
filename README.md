@@ -1,7 +1,3 @@
-﻿Of course. Here is a complete `README.md` file for the iVA application we've built.
-
------
-
 # iVA: Intelligent Video Analytics
 
 iVA is a real-time web application that processes a live camera feed to perform object detection, text extraction (OCR), and AI-driven contextual analysis. It features a dual-model system, allowing users to switch between general object detection and specific, text-based object searching.
