@@ -366,3 +366,4 @@ FodyWeavers.xsd
 /nets/yolov8n.onnx
 /Services/GeminiService.cs
 /Services/ObjectDetectionService.cs
+/nets/object_detector.onnx
