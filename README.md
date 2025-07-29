@@ -1,5 +1,3 @@
-﻿Of course. Here is a complete `README.md` file for the iVA application we've built.
-
 -----
 
 # iVA: Intelligent Video Analytics
