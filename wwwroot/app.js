@@ -167,11 +167,11 @@
         return `
         <div class="p-4 rounded-lg animate-fade-in glass-panel bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700" data-log-id="${log.id}">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${timestamp}</p>
-            <p class="mb-3 text-sm text-gray-800 dark:text-gray-200">${descriptionHtml}</p> <details class="text-xs">
+            <p class="mb-3 text-sm text-gray-800 dark:text-gray-400">${descriptionHtml}</p> <details class="text-xs">
                 <summary class="cursor-pointer text-teal-600 dark:text-teal-400">Details</summary>
                 <div class="mt-2 pt-2 border-t border-gray-300 dark:border-slate-600 space-y-1">
-                    <p><strong class="font-medium text-gray-800 dark:text-gray-200">Objects:</strong> ${formattedObjects}</p>
-                    <p><strong class="font-medium text-gray-800 dark:text-gray-200">Text:</strong> ${text}</p>
+                    <p><strong class="font-medium text-gray-800 dark:text-gray-400">Objects:</strong> ${formattedObjects}</p>
+                    <p><strong class="font-medium text-gray-800 dark:text-gray-400">Text:</strong> ${text}</p>
                 </div>
             </details>
         </div>
