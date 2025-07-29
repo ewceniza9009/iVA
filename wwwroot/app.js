@@ -429,7 +429,8 @@
         applyTheme(savedTheme);                                 
         await fetchAndRenderLogs();
 
-        liveCameraTabBtn.click();                                         
+        liveCameraTabBtn.click();
+        initializeCamera();
     }
 
     initialize();
