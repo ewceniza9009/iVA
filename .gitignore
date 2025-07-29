@@ -365,3 +365,4 @@ FodyWeavers.xsd
 /tessdata/eng.traineddata
 /nets/yolov8n.onnx
 /Services/GeminiService.cs
+/Services/ObjectDetectionService.cs
