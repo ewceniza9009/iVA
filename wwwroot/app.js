@@ -44,7 +44,7 @@
         detections.forEach(det => {
             const { x, y, width, height } = det.boundingBox;
             const isDark = document.documentElement.classList.contains('dark');
-            ctx.strokeStyle = isDark ? '#22d3ee' : '#0891b2';                     
+            ctx.strokeStyle = isDark ? '#22d3ee' : '#0891b2';
             ctx.lineWidth = 2;
             ctx.strokeRect(x, y, width, height);
 
@@ -54,7 +54,7 @@
 
             ctx.fillStyle = isDark ? '#22d3ee' : '#0891b2';
             ctx.fillRect(x, y - 20, textWidth + 10, 20);
-            ctx.fillStyle = isDark ? '#0f172a' : '#ffffff';                     
+            ctx.fillStyle = isDark ? '#0f172a' : '#ffffff';
             ctx.fillText(text, x + 5, y - 5);
         });
     }
@@ -86,17 +86,35 @@
         }
     }
 
+    // Function to convert Markdown-like text to HTML
+    function markdownToHtml(markdownText) {
+        if (!markdownText) return '';
+
+        // Replace bold **text** with <strong>text</strong>
+        let html = markdownText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+        // Replace bullet points (if any, based on Gemini's output style, which uses '- ')
+        html = html.replace(/^- (.*)/gm, '<li>$1</li>'); // For unordered lists
+        if (html.includes('<li>')) {
+            html = `<ul>${html}</ul>`;
+        }
+
+        // Replace newlines with <br> for simple line breaks
+        html = html.replace(/\n/g, '<br>');
+
+        return html;
+    }
+
     function createLogCard(log) {
         const timestamp = new Date(log.timestamp).toLocaleString();
-        const description = log.sceneDescription || "Analysis pending...";
+        const descriptionHtml = markdownToHtml(log.sceneDescription); // Convert Markdown to HTML
         const objects = log.objectsDetected || "None";
         const text = log.extractedText || "None";
 
         return `
         <div class="p-4 rounded-lg bg-white/50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 animate-fade-in" data-log-id="${log.id}">
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">${timestamp}</p>
-            <p class="mb-3 text-sm">${description}</p>
-            <details class="text-xs">
+            <p class="mb-3 text-sm">${descriptionHtml}</p> <details class="text-xs">
                 <summary class="cursor-pointer text-cyan-600 dark:text-cyan-400">Details</summary>
                 <div class="mt-2 pt-2 border-t border-slate-300 dark:border-slate-600 space-y-1">
                     <p><strong class="font-medium">Objects:</strong> ${objects}</p>
@@ -104,7 +122,7 @@
                 </div>
             </details>
         </div>
-    `;
+        `;
     }
 
     async function fetchAndRenderLogs() {
@@ -144,8 +162,8 @@
         processingIntervalId = setInterval(processFrame, 500);
         playBtn.classList.add('opacity-50', 'cursor-not-allowed');
         pauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        fetchAndRenderLogs();         
-        setInterval(fetchAndRenderLogs, 5000);                     
+        fetchAndRenderLogs();
+        setInterval(fetchAndRenderLogs, 5000);
     }
 
     function stopProcessing() {
@@ -162,6 +180,8 @@
     async function initialize() {
         const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         applyTheme(savedTheme);
+
+        await fetchAndRenderLogs();
 
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
