@@ -47,7 +47,7 @@ namespace iVA.Controllers
 
             var log = new DetectionLog
             {
-                Timestamp = System.DateTime.UtcNow,
+                Timestamp = System.DateTime.Now,
                 ObjectsDetected = string.Join(", ", detections.Select(d => d.ClassName)),
                 ObjectCount = detections.Count,
                 ExtractedText = extractedText,
