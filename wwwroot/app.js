@@ -1,9 +1,4 @@
 ﻿document.addEventListener('DOMContentLoaded', () => {
-    const video = document.getElementById('videoFeed');
-    const canvas = document.getElementById('canvas');
-    const ctx = canvas.getContext('2d');
-    const playBtn = document.getElementById('playBtn');
-    const pauseBtn = document.getElementById('pauseBtn');
     const objectsEl = document.getElementById('objectCounts');
     const textEl = document.getElementById('extractedText');
     const logsContainer = document.getElementById('logsContainer');
@@ -11,7 +6,28 @@
     const lightIcon = document.getElementById('theme-toggle-light-icon');
     const darkIcon = document.getElementById('theme-toggle-dark-icon');
 
+    const liveCameraTabBtn = document.getElementById('liveCameraTabBtn');
+    const videoFileTabBtn = document.getElementById('videoFileTabBtn');
+    const liveCameraContent = document.getElementById('liveCameraContent');
+    const videoFileContent = document.getElementById('videoFileContent');
+
+    const cameraVideoFeed = document.getElementById('videoFeed');                     
+    const cameraCanvas = document.getElementById('canvas');
+    const cameraPlayBtn = document.getElementById('playBtn');
+    const cameraPauseBtn = document.getElementById('pauseBtn');
+
+    const videoFileFeed = document.getElementById('videoFeedAlt');                     
+    const videoFileCanvas = document.getElementById('canvasAlt');
+    const videoFileInput = document.getElementById('videoFileInput');
+    const videoFilePlayBtn = document.getElementById('playVideoFileBtn');
+    const videoFilePauseBtn = document.getElementById('pauseVideoFileBtn');
+
+    let currentActiveVideo = null;                                         
+    let currentActiveCanvas = null;                             
     let processingIntervalId = null;
+    let currentCameraStream = null;             
+    let activeTab = 'camera';             
+
     const PROCESS_API_URL = '/api/videoprocessing/process-frame';
     const LOGS_API_URL = '/api/logs';
 
@@ -35,11 +51,14 @@
     });
 
     function drawBoundingBoxes(detections) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!currentActiveCanvas || !currentActiveVideo) return;
+
+        const ctx = currentActiveCanvas.getContext('2d');
+        ctx.clearRect(0, 0, currentActiveCanvas.width, currentActiveCanvas.height);
         if (!detections || detections.length === 0) return;
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        currentActiveCanvas.width = currentActiveVideo.videoWidth;
+        currentActiveCanvas.height = currentActiveVideo.videoHeight;
 
         detections.forEach(det => {
             const { x, y, width, height } = det.boundingBox;
@@ -60,13 +79,13 @@
     }
 
     async function processFrame() {
-        if (video.paused || video.readyState < video.HAVE_CURRENT_DATA) return;
+        if (!currentActiveVideo || currentActiveVideo.paused || currentActiveVideo.readyState < currentActiveVideo.HAVE_CURRENT_DATA) return;
 
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = video.videoWidth;
-        tempCanvas.height = video.videoHeight;
+        tempCanvas.width = currentActiveVideo.videoWidth;
+        tempCanvas.height = currentActiveVideo.videoHeight;
         const tempCtx = tempCanvas.getContext('2d');
-        tempCtx.drawImage(video, 0, 0, tempCanvas.width, tempCanvas.height);
+        tempCtx.drawImage(currentActiveVideo, 0, 0, tempCanvas.width, tempCanvas.height);
         const imageBase64 = tempCanvas.toDataURL('image/jpeg').split(',')[1];
 
         try {
@@ -78,7 +97,22 @@
             if (!response.ok) return;
 
             const result = await response.json();
-            objectsEl.textContent = result.detections.length > 0 ? `${result.detections.length} objects found.` : 'No objects detected.';
+
+            const objectCountsMap = {};
+            if (result.detections && result.detections.length > 0) {
+                result.detections.forEach(det => {
+                    const className = det.className;
+                    objectCountsMap[className] = (objectCountsMap[className] || 0) + 1;
+                });
+
+                const formattedCounts = Object.entries(objectCountsMap)
+                    .map(([className, count]) => `${count} ${className}${count > 1 ? 's' : ''}`)
+                    .join(', ');
+                objectsEl.textContent = formattedCounts;
+            } else {
+                objectsEl.textContent = 'No objects detected.';
+            }
+
             textEl.textContent = result.extractedText || 'No text detected.';
             drawBoundingBoxes(result.detections);
         } catch (error) {
@@ -86,38 +120,40 @@
         }
     }
 
-    // Function to convert Markdown-like text to HTML
     function markdownToHtml(markdownText) {
         if (!markdownText) return '';
-
-        // Replace bold **text** with <strong>text</strong>
         let html = markdownText.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-
-        // Replace bullet points (if any, based on Gemini's output style, which uses '- ')
-        html = html.replace(/^- (.*)/gm, '<li>$1</li>'); // For unordered lists
+        html = html.replace(/^- (.*)/gm, '<li>$1</li>');
         if (html.includes('<li>')) {
             html = `<ul>${html}</ul>`;
         }
-
-        // Replace newlines with <br> for simple line breaks
         html = html.replace(/\n/g, '<br>');
-
         return html;
     }
 
     function createLogCard(log) {
         const timestamp = new Date(log.timestamp).toLocaleString();
-        const descriptionHtml = markdownToHtml(log.sceneDescription); // Convert Markdown to HTML
-        const objects = log.objectsDetected || "None";
+        const descriptionHtml = markdownToHtml(log.sceneDescription);
         const text = log.extractedText || "None";
 
+        let formattedObjects = "None";
+        if (log.objectsDetected && log.objectsDetected !== "None" && log.objectsDetected.trim() !== "") {
+            const individualObjects = log.objectsDetected.split(', ').map(s => s.trim()).filter(s => s.length > 0);
+            const objectCountsMap = {};
+            individualObjects.forEach(obj => {
+                objectCountsMap[obj] = (objectCountsMap[obj] || 0) + 1;
+            });
+            formattedObjects = Object.entries(objectCountsMap)
+                .map(([className, count]) => `${count} ${className}${count > 1 ? 's' : ''}`)
+                .join(', ');
+        }
         return `
         <div class="p-4 rounded-lg bg-white/50 dark:bg-slate-800/70 border border-slate-200 dark:border-slate-700 animate-fade-in" data-log-id="${log.id}">
             <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">${timestamp}</p>
             <p class="mb-3 text-sm">${descriptionHtml}</p> <details class="text-xs">
                 <summary class="cursor-pointer text-cyan-600 dark:text-cyan-400">Details</summary>
                 <div class="mt-2 pt-2 border-t border-slate-300 dark:border-slate-600 space-y-1">
-                    <p><strong class="font-medium">Objects:</strong> ${objects}</p>
+                    <p><strong class="font-medium">Objects:</strong> ${formattedObjects}</p>
                     <p><strong class="font-medium">Text:</strong> ${text}</p>
                 </div>
             </details>
@@ -156,46 +192,201 @@
         }
     }
 
+    function stopAllVideoSources() {
+        stopProcessing();                     
+
+        if (currentCameraStream) {
+            currentCameraStream.getTracks().forEach(track => track.stop());
+            currentCameraStream = null;
+        }
+
+        cameraVideoFeed.srcObject = null;
+        cameraVideoFeed.removeAttribute('src');
+        cameraVideoFeed.load();
+
+        videoFileFeed.srcObject = null;
+        videoFileFeed.removeAttribute('src');
+        videoFileFeed.load();
+
+        cameraCanvas.getContext('2d').clearRect(0, 0, cameraCanvas.width, cameraCanvas.height);
+        videoFileCanvas.getContext('2d').clearRect(0, 0, videoFileCanvas.width, videoFileCanvas.height);
+
+        currentActiveVideo = null;
+        currentActiveCanvas = null;
+        console.log("All video sources and canvases cleared.");
+    }
+
     function startProcessing() {
-        if (processingIntervalId) return;
-        video.play();
+        if (processingIntervalId) return;         
+
+        if (!currentActiveVideo) {
+            console.warn("No video source (camera or file) available to start processing.");
+            objectsEl.textContent = 'No video source selected.';
+            textEl.textContent = 'No video source selected.';
+            return;
+        }
+
+        currentActiveVideo.play().catch(e => {
+            console.error("Error attempting to play video:", e);
+            objectsEl.textContent = 'Autoplay blocked. Click play again.';
+            textEl.textContent = 'Autoplay blocked. Click play again.';
+        });
+
         processingIntervalId = setInterval(processFrame, 500);
-        playBtn.classList.add('opacity-50', 'cursor-not-allowed');
-        pauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+
+        if (activeTab === 'camera') {
+            cameraPlayBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            cameraPauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        } else {             
+            videoFilePlayBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            videoFilePauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
+
         fetchAndRenderLogs();
-        setInterval(fetchAndRenderLogs, 5000);
+        setInterval(fetchAndRenderLogs, 5000);             
     }
 
     function stopProcessing() {
-        if (!processingIntervalId) return;
-        video.pause();
+        if (!processingIntervalId) return;         
+
+        if (currentActiveVideo) {
+            currentActiveVideo.pause();
+        }
         clearInterval(processingIntervalId);
         processingIntervalId = null;
-        playBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        pauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+
+        if (activeTab === 'camera') {
+            cameraPlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            cameraPauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        } else {             
+            videoFilePlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            videoFilePauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        }
+
         objectsEl.textContent = 'Paused';
         textEl.textContent = 'Paused';
     }
 
-    async function initialize() {
-        const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-        applyTheme(savedTheme);
-
-        await fetchAndRenderLogs();
-
+    async function initializeCamera() {
+        stopAllVideoSources();                 
+        currentActiveVideo = cameraVideoFeed;
+        currentActiveCanvas = cameraCanvas;
+        activeTab = 'camera';
         try {
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: { width: { ideal: 640 }, height: { ideal: 480 } }
             });
-            video.srcObject = stream;
+            cameraVideoFeed.srcObject = stream;
+            currentCameraStream = stream;
+            console.log("Camera initialized and set as source.");
+            cameraPlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            cameraPauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            videoFilePlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');                             
+            videoFilePauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
         } catch (err) {
             console.error("Error accessing camera:", err);
-            document.querySelector('.lg\\:col-span-2').innerHTML = '<p class="text-rose-500 text-center p-8">Camera access denied or not available.</p>';
+            liveCameraContent.querySelector('.bg-black').innerHTML = '<p class="text-rose-500 text-center p-8">Camera access denied or not available.</p>';
+            cameraPlayBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
     }
 
-    playBtn.addEventListener('click', startProcessing);
-    pauseBtn.addEventListener('click', stopProcessing);
+    function prepareVideoFile() {
+        stopAllVideoSources();                 
+        currentActiveVideo = videoFileFeed;
+        currentActiveCanvas = videoFileCanvas;
+        activeTab = 'videoFile';
+        videoFilePlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        videoFilePauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        cameraPlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');                         
+        cameraPauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+        console.log("Prepared for video file input.");
+    }
+
+    videoFileInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            stopProcessing();                 
+            stopAllVideoSources();                             
+
+            currentActiveVideo = videoFileFeed;
+            currentActiveCanvas = videoFileCanvas;
+            activeTab = 'videoFile';                         
+
+            const fileURL = URL.createObjectURL(file);
+            videoFileFeed.src = fileURL;
+            videoFileFeed.loop = true;                         
+            videoFileFeed.muted = true;                             
+            videoFileFeed.load();             
+
+            videoFileFeed.onloadeddata = () => {
+                console.log("Video file loaded into videoFileFeed:", file.name);
+                videoFilePlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            };
+
+            videoFileFeed.onended = () => {
+                if (activeTab === 'videoFile' && !videoFileFeed.loop) {
+                    stopProcessing();
+                    console.log("Video file ended, processing stopped.");
+                }
+            };
+
+        } else {
+            console.log("Video file selection cancelled.");
+            videoFileFeed.removeAttribute('src');
+            videoFileFeed.load();
+            objectsEl.textContent = 'No video file selected.';
+            textEl.textContent = 'No video file selected.';
+            videoFilePlayBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            if (activeTab === 'videoFile') {
+                videoFilePlayBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                videoFilePauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+    });
+
+    liveCameraTabBtn.addEventListener('click', () => {
+        if (activeTab === 'camera') return;
+        stopProcessing();             
+        stopAllVideoSources();             
+        liveCameraContent.classList.remove('hidden');
+        videoFileContent.classList.add('hidden');
+        liveCameraTabBtn.classList.add('text-cyan-600', 'border-b-2', 'border-cyan-600', 'dark:text-cyan-400', 'dark:border-cyan-400');
+        liveCameraTabBtn.classList.remove('text-slate-500', 'hover:text-cyan-600', 'dark:text-slate-400', 'hover:dark:text-cyan-400', 'border-transparent');
+        videoFileTabBtn.classList.add('text-slate-500', 'hover:text-cyan-600', 'dark:text-slate-400', 'hover:dark:text-cyan-400', 'border-b-2', 'border-transparent');
+        videoFileTabBtn.classList.remove('text-cyan-600', 'border-cyan-600', 'dark:text-cyan-400', 'dark:border-cyan-400');
+        initializeCamera();                     
+        objectsEl.textContent = 'Ready for camera feed.';
+        textEl.textContent = 'Ready for camera feed.';
+    });
+
+    videoFileTabBtn.addEventListener('click', () => {
+        if (activeTab === 'videoFile') return;
+        stopProcessing();             
+        stopAllVideoSources();             
+        videoFileContent.classList.remove('hidden');
+        liveCameraContent.classList.add('hidden');
+        videoFileTabBtn.classList.add('text-cyan-600', 'border-b-2', 'border-cyan-600', 'dark:text-cyan-400', 'dark:border-cyan-400');
+        videoFileTabBtn.classList.remove('text-slate-500', 'hover:text-cyan-600', 'dark:text-slate-400', 'hover:dark:text-cyan-400', 'border-transparent');
+        liveCameraTabBtn.classList.add('text-slate-500', 'hover:text-cyan-600', 'dark:text-slate-400', 'hover:dark:text-cyan-400', 'border-b-2', 'border-transparent');
+        liveCameraTabBtn.classList.remove('text-cyan-600', 'border-cyan-600', 'dark:text-cyan-400', 'dark:border-cyan-400');
+        prepareVideoFile();                             
+        objectsEl.textContent = 'Select a video file.';
+        textEl.textContent = 'Select a video file.';
+    });
+
+    cameraPlayBtn.addEventListener('click', startProcessing);
+    cameraPauseBtn.addEventListener('click', stopProcessing);
+    videoFilePlayBtn.addEventListener('click', startProcessing);
+    videoFilePauseBtn.addEventListener('click', stopProcessing);
+
+
+    async function initialize() {
+        const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        applyTheme(savedTheme);
+        await fetchAndRenderLogs();
+
+        liveCameraTabBtn.click();                                         
+    }
 
     initialize();
 });

@@ -25,6 +25,7 @@
             backdrop-filter: blur(12px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
+
         @keyframes fadeIn {
             from {
                 opacity: 0;
@@ -82,13 +83,45 @@
 
         <main class="grid grid-cols-1 lg:grid-cols-5 gap-6 h-[85vh]">
             <div class="lg:col-span-3 flex flex-col">
-                <div class="bg-black rounded-xl shadow-lg relative aspect-video flex-grow">
-                    <video id="videoFeed" class="w-full h-full rounded-xl" muted playsinline></video>
-                    <canvas id="canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                <div class="flex mb-4">
+                    <button id="liveCameraTabBtn" class="px-5 py-2 text-sm font-medium rounded-t-lg focus:outline-none transition-colors duration-200
+                                                text-cyan-600 border-b-2 border-cyan-600 dark:text-cyan-400 dark:border-cyan-400">
+                        Live Camera
+                    </button>
+                    <button id="videoFileTabBtn" class="px-5 py-2 text-sm font-medium rounded-t-lg focus:outline-none transition-colors duration-200
+                                                text-slate-500 hover:text-cyan-600 dark:text-slate-400 hover:dark:text-cyan-400 border-b-2 border-transparent">
+                        Video File
+                    </button>
                 </div>
-                <div class="flex justify-center items-center gap-4 mt-4">
-                    <button id="playBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Play</button>
-                    <button id="pauseBtn" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-6 rounded-lg transition-colors opacity-50 cursor-not-allowed">Pause</button>
+
+                <div id="liveCameraContent" class="tab-content flex flex-col flex-grow">
+                    <div class="bg-black rounded-xl shadow-lg relative aspect-video flex-grow">
+                        <video id="videoFeed" class="w-full h-full rounded-xl" muted playsinline></video>
+                        <canvas id="canvas" class="absolute top-0 left-0 w-full h-full"></canvas>
+                    </div>
+                    <div class="flex justify-center items-center gap-4 mt-4">
+                        <button id="playBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Play</button>
+                        <button id="pauseBtn" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-6 rounded-lg transition-colors opacity-50 cursor-not-allowed">Pause</button>
+                    </div>
+                </div>
+
+                <div id="videoFileContent" class="tab-content hidden flex flex-col flex-grow">
+                    <div class="bg-black rounded-xl shadow-lg relative aspect-video flex-grow">
+                        <video id="videoFeedAlt" class="w-full h-full rounded-xl" muted playsinline></video>
+                        <canvas id="canvasAlt" class="absolute top-0 left-0 w-full h-full"></canvas>
+                    </div>
+                    <div class="flex flex-col items-center gap-4 mt-4">
+                        <div class="w-full flex justify-center">
+                            <input type="file" id="videoFileInput" accept="video/*" class="hidden">
+                            <label for="videoFileInput" class="cursor-pointer bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">
+                                Select Video File
+                            </label>
+                        </div>
+                        <div class="flex justify-center gap-4 w-full">
+                            <button id="playVideoFileBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-6 rounded-lg transition-colors">Play Video</button>
+                            <button id="pauseVideoFileBtn" class="bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-6 rounded-lg transition-colors opacity-50 cursor-not-allowed">Pause Video</button>
+                        </div>
+                    </div>
                 </div>
             </div>
 
