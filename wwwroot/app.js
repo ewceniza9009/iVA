@@ -285,7 +285,7 @@
     }
 
     async function initializeCamera() {
-        stopAllVideoSources();                 
+        stopAllVideoSources();
         currentActiveVideo = cameraVideoFeed;
         currentActiveCanvas = cameraCanvas;
         activeTab = 'camera';
@@ -298,12 +298,19 @@
             console.log("Camera initialized and set as source.");
             cameraPlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             cameraPauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
-            videoFilePlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');                             
+            videoFilePlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             videoFilePauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            objectsEl.textContent = 'Camera ready. Click Play to start.';
+            textEl.textContent = 'Camera ready. Click Play to start.';
         } catch (err) {
             console.error("Error accessing camera:", err);
-            liveCameraContent.querySelector('.bg-black').innerHTML = '<p class="text-rose-500 text-center p-8">Camera access denied or not available.</p>';
+            liveCameraContent.querySelector('.bg-black').innerHTML = `
+            <p class="text-rose-500 text-center p-8">
+                Camera access denied or not available. Please ensure camera permissions are granted or select a video file.
+            </p>`;
             cameraPlayBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            objectsEl.textContent = 'Camera unavailable.';
+            textEl.textContent = 'Camera unavailable.';
         }
     }
 
