@@ -364,3 +364,4 @@ FodyWeavers.xsd
 /appsettings.json
 /tessdata/eng.traineddata
 /nets/yolov8n.onnx
+/Services/GeminiService.cs
