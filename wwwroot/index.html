@@ -1,0 +1,47 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>iVA - Intelligent Video Analytics</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="app.js" defer></script>
+</head>
+
+<body class="bg-gray-900 text-gray-200 font-sans">
+    <div class="container mx-auto p-4 lg:p-8">
+        <header class="mb-6">
+            <h1 class="text-4xl font-bold text-cyan-400">iVA: Intelligent Video Analytics</h1>
+            <p class="text-gray-400">Real-time object detection, OCR, and scene analysis.</p>
+        </header>
+
+        <main class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div class="lg:col-span-2">
+                <div class="bg-black rounded-lg shadow-lg relative aspect-video">
+                    <video id="videoFeed" class="w-full h-full rounded-lg" style="z-index: 5;" autoplay muted playsinline></video>
+                    <canvas id="canvas" class="absolute top-0 left-0 w-full h-full" style="z-index: 10;"></canvas>
+                </div>
+                <div class="flex justify-center items-center gap-4 mt-4">
+                    <button id="playBtn" class="bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-2 px-6 rounded-lg">Play</button>
+                    <button id="pauseBtn" class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-6 rounded-lg">Pause</button>
+                </div>
+            </div>
+
+            <aside class="bg-gray-800 p-6 rounded-lg shadow-lg flex flex-col gap-6">
+                <div>
+                    <h2 class="text-xl font-semibold text-cyan-400 mb-2">Scene Description</h2>
+                    <p id="sceneDescription" class="text-gray-300 h-24">Initializing...</p>
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold text-cyan-400 mb-2">Detected Objects</h2>
+                    <div id="objectCounts" class="text-gray-300">No objects detected.</div>
+                </div>
+                <div>
+                    <h2 class="text-xl font-semibold text-cyan-400 mb-2">Extracted Text</h2>
+                    <pre id="extractedText" class="text-gray-300 bg-gray-700 p-2 rounded h-24 overflow-y-auto">No text detected.</pre>
+                </div>
+            </aside>
+        </main>
+    </div>
+</body>
+</html>

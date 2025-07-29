@@ -1,0 +1,6 @@
+@iVA_HostAddress = http://localhost:5295
+
+GET {{iVA_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
