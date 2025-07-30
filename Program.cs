@@ -38,12 +38,15 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddControllers();
-builder.Services.AddScoped<ObjectDetectionService>();
-builder.Services.AddScoped<OCRService>();
-builder.Services.AddScoped<GeminiService>();    
-builder.Services.AddSingleton<LogFileWriterService>();
-builder.Services.AddHostedService<LogProcessingWorker>();
 
+builder.Services.AddSingleton<ApplicationStatusService>();
+builder.Services.AddSingleton<ObjectDetectionService>();
+builder.Services.AddSingleton<OCRService>();
+builder.Services.AddSingleton<GeminiService>();    
+builder.Services.AddSingleton<LogFileWriterService>();
+
+builder.Services.AddHostedService<LogProcessingWorker>();
+builder.Services.AddHostedService<ModelLoadingService>();
 
 var app = builder.Build();
 

@@ -26,7 +26,9 @@
     let currentActiveCanvas = null;                             
     let processingIntervalId = null;
     let currentCameraStream = null;             
-    let activeTab = 'camera';             
+    let activeTab = 'camera';
+
+    const loadingOverlay = document.getElementById('loading-overlay');
 
     const PROCESS_API_URL = '/api/videoprocessing/process-frame';
     const LOGS_API_URL = '/api/logs';
@@ -432,5 +434,27 @@
         initializeCamera();
     }
 
-    initialize();
+    function checkBackendStatus() {
+        console.log("Checking backend status...");
+        const statusInterval = setInterval(async () => {
+            try {
+                const response = await fetch('/api/health/status');
+
+                if (response.ok) {
+                    console.log("Backend is ready. Hiding loader.");
+                    clearInterval(statusInterval);         
+
+                    loadingOverlay.classList.add('fade-out');
+                    setTimeout(() => {
+                        loadingOverlay.style.display = 'none';
+                        initialize();                     
+                    }, 500);                     
+                }
+            } catch (error) {
+                console.log("Backend not reachable yet, retrying...");
+            }
+        }, 2000);                 
+    }
+
+    checkBackendStatus();
 });
