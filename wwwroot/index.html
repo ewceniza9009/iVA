@@ -38,6 +38,14 @@
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
+        details[open] > summary .details-arrow {
+            transform: rotate(180deg);
+        }
+
+        summary::-webkit-details-marker {
+            display: none;       
+        }
+
 
         @keyframes fadeIn {
             from {

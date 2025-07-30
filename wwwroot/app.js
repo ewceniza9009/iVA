@@ -22,7 +22,6 @@
     const videoFilePlayBtn = document.getElementById('playVideoFileBtn');
     const videoFilePauseBtn = document.getElementById('pauseVideoFileBtn');
 
-    // Auth Elements
     const authModal = document.getElementById('auth-modal');
     const mainContent = document.getElementById('main-content');
     const loginForm = document.getElementById('login-form');
@@ -46,9 +45,30 @@
     const AUTH_LOGIN_URL = '/api/auth/login';
     const AUTH_REGISTER_URL = '/api/auth/register';
 
-    // --- Auth State ---
     let authToken = localStorage.getItem('authToken');
     let username = localStorage.getItem('username');
+
+    logsContainer.addEventListener('click', (e) => {
+        if (e.target && e.target.matches('.toggle-description-btn')) {
+            const button = e.target;
+            const detailsDiv = button.parentElement.querySelector('.description-details');
+            const ellipsisSpan = button.parentElement.querySelector('.ellipsis-indicator');
+
+            if (detailsDiv) {
+                detailsDiv.classList.toggle('hidden');
+
+                if (ellipsisSpan) {
+                    ellipsisSpan.classList.toggle('hidden');
+                }
+
+                if (detailsDiv.classList.contains('hidden')) {
+                    button.textContent = 'Show more...';
+                } else {
+                    button.textContent = 'Show less';
+                }
+            }
+        }
+    });
 
     const authenticatedFetch = async (url, options = {}) => {
         const headers = {
@@ -93,7 +113,6 @@
         updateAuthState(null, null);
     }
 
-    // --- Auth UI Logic ---
     toggleAuthModeBtn.addEventListener('click', () => {
         loginForm.classList.toggle('hidden');
         registerForm.classList.toggle('hidden');
@@ -142,7 +161,6 @@
                 const errorData = await response.text();
                 throw new Error(errorData || 'Registration failed');
             }
-            // Switch to login form after successful registration
             toggleAuthModeBtn.click();
             document.getElementById('login-username').value = uname;
             document.getElementById('login-password').value = '';
@@ -227,7 +245,7 @@
 
     async function processFrame() {
         if (!currentActiveVideo || currentActiveVideo.paused || currentActiveVideo.readyState < currentActiveVideo.HAVE_CURRENT_DATA) return;
-        if (!authToken) return; // Don't process if not logged in
+        if (!authToken) return;                         
 
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = currentActiveVideo.videoWidth;
@@ -280,10 +298,9 @@
 
     function createLogCard(log) {
         const timestamp = new Date(log.timestamp).toLocaleString();
-        const descriptionHtml = markdownToHtml(log.sceneDescription);
         const text = log.extractedText || "None";
-
         let formattedObjects = "None";
+
         if (log.objectsDetected && log.objectsDetected !== "None" && log.objectsDetected.trim() !== "") {
             const individualObjects = log.objectsDetected.split(', ').map(s => s.trim()).filter(s => s.length > 0);
             const objectCountsMap = {};
@@ -295,11 +312,36 @@
                 .join(', ');
         }
 
+        const fullDescription = log.sceneDescription || '';
+        const parts = fullDescription.split(/\n\s*\n/);                                     
+        const summaryText = parts[0] || '';
+        const detailText = parts.length > 1 ? parts.slice(1).join('\n\n') : '';
+
+        const summaryHtml = markdownToHtml(summaryText);
+        let descriptionContent;
+
+        if (detailText) {
+            const detailHtml = markdownToHtml(detailText);
+            descriptionContent = `
+                <div class="description-text">
+                    <p class="inline">${summaryHtml}</p><span class="ellipsis-indicator">...</span>
+                    <div class="description-details hidden" style="margin-top: 0.75rem;">${detailHtml}</div>
+                </div>
+                <button class="toggle-description-btn text-xs font-semibold text-teal-600 dark:text-teal-400 hover:underline focus:outline-none mt-2">Show more...</button>
+            `;
+        } else {
+            descriptionContent = `<div class="description-text"><p>${summaryHtml}</p></div>`;
+        }
+
         return `
         <div class="p-4 rounded-lg animate-fade-in glass-panel bg-white dark:bg-slate-800 border-gray-200 dark:border-slate-700" data-log-id="${log.id}">
             <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${timestamp}</p>
-            <p class="mb-3 text-sm text-gray-800 dark:text-gray-400">${descriptionHtml}</p> <details class="text-xs">
-                <summary class="cursor-pointer text-teal-600 dark:text-teal-400">Details</summary>
+            <div class="description-wrapper mb-3">${descriptionContent}</div>
+            <details class="text-xs">
+                <summary class="list-none cursor-pointer text-teal-600 dark:text-teal-400 flex justify-between items-center font-medium">
+                    Details
+                    <svg class="w-4 h-4 transition-transform transform details-arrow" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+                </summary>
                 <div class="mt-2 pt-2 border-t border-gray-300 dark:border-slate-600 space-y-1">
                     <p><strong class="font-medium text-gray-800 dark:text-gray-400">Objects:</strong> ${formattedObjects}</p>
                     <p><strong class="font-medium text-gray-800 dark:text-gray-400">Text:</strong> ${text}</p>
@@ -310,7 +352,7 @@
     }
 
     async function fetchAndRenderLogs() {
-        if (!authToken) return; // Don't fetch if not logged in
+        if (!authToken) return;                         
         try {
             const response = await authenticatedFetch(LOGS_API_URL);
             if (!response.ok) return;
@@ -578,7 +620,6 @@
                     loadingOverlay.classList.add('fade-out');
                     setTimeout(() => {
                         loadingOverlay.style.display = 'none';
-                        // Check auth state after backend is ready
                         updateAuthState(authToken, username);
                     }, 500);
                 }
