@@ -10,13 +10,15 @@ namespace iVA.Workers
         private readonly ILogger<LogProcessingWorker> _logger;
         private readonly IServiceProvider _serviceProvider;
         private readonly string _logFilePath;
+        private readonly ApplicationStatusService _appService;
 
-        public LogProcessingWorker(ILogger<LogProcessingWorker> logger, IServiceProvider serviceProvider, IWebHostEnvironment env)
+        public LogProcessingWorker(ILogger<LogProcessingWorker> logger, IServiceProvider serviceProvider, IWebHostEnvironment env, ApplicationStatusService appService)
         {
             _logger = logger;
             _serviceProvider = serviceProvider;
             var logDir = Path.Combine(env.ContentRootPath, "logs");
             _logFilePath = Path.Combine(logDir, "iva.log");
+            _appService = appService;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -79,16 +81,20 @@ namespace iVA.Workers
 
                 using (var scope = _serviceProvider.CreateScope())
                 {
-                    var geminiService = scope.ServiceProvider.GetRequiredService<GeminiService>();
+                    bestLog.SceneDescription = "AI is not enabled";
 
-                    var dummyDetections = bestLog.ObjectsDetected.Split(", ", StringSplitOptions.RemoveEmptyEntries)
-                                                .Select(name => new Detection { ClassName = name }).ToList();
+                    if (_appService.IsAIEnabled && bestLog != null)
+                    {
+                        var geminiService = scope.ServiceProvider.GetRequiredService<GeminiService>();
+                        var dummyDetections = bestLog!.ObjectsDetected!.Split(", ", StringSplitOptions.RemoveEmptyEntries)
+                                                    .Select(name => new Detection { ClassName = name }).ToList();
 
-                    var imageBytes = Convert.FromBase64String(bestLog.ImageBase64);
+                        var imageBytes = Convert.FromBase64String(bestLog.ImageBase64);
 
-                    _logger.LogInformation("Generating scene analysis for the best log (User: {UserId}) using multimodal input...", userLogGroup.Key);
+                        _logger.LogInformation("Generating scene analysis for the best log (User: {UserId}) using multimodal input...", userLogGroup.Key);
 
-                    bestLog.SceneDescription = await geminiService.GenerateSceneDescriptionAsync(imageBytes, dummyDetections, bestLog.ExtractedText);
+                        bestLog.SceneDescription = await geminiService.GenerateSceneDescriptionAsync(imageBytes, dummyDetections, bestLog.ExtractedText);
+                    }                    
 
                     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                     dbContext.DetectionLogs.Add(bestLog);
