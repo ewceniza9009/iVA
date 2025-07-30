@@ -1,6 +1,6 @@
 ﻿using System;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema; // Required for NotMapped
+using System.ComponentModel.DataAnnotations.Schema; // Required for NotMapped & ForeignKey
 
 namespace iVA.Models
 {
@@ -18,6 +18,13 @@ namespace iVA.Models
         public string? ExtractedText { get; set; }
 
         public string? SceneDescription { get; set; }
+
+        // Foreign key for the User
+        public int UserId { get; set; }
+
+        [ForeignKey("UserId")]
+        public virtual User User { get; set; }
+
 
         // This property will be used for temporary logging but not saved to the database.
         [NotMapped]

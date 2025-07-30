@@ -1,6 +1,6 @@
 ﻿using iVA.Data;
 using iVA.Models;
-using iVA.Services;      
+using iVA.Services;
 using System.Text.Json;
 
 namespace iVA.Workers
@@ -26,7 +26,7 @@ namespace iVA.Workers
             while (!stoppingToken.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-                await ProcessLogFileAsync();     
+                await ProcessLogFileAsync();
             }
         }
 
@@ -57,39 +57,45 @@ namespace iVA.Workers
                 }
             }
 
-            var reliableLogs = allLogs.Where(l => l.ObjectCount > 0).ToList();
-            if (!reliableLogs.Any())
+            // Group logs by user to process them in batches per user
+            var logsByUser = allLogs.GroupBy(l => l.UserId);
+
+            foreach (var userLogGroup in logsByUser)
             {
-                _logger.LogInformation("No reliable logs to process in this batch.");
-                return;
-            }
+                var reliableLogs = userLogGroup.Where(l => l.ObjectCount > 0).ToList();
+                if (!reliableLogs.Any())
+                {
+                    _logger.LogInformation("No reliable logs to process for user {UserId} in this batch.", userLogGroup.Key);
+                    continue;
+                }
 
-            var bestLog = reliableLogs.OrderByDescending(l => l.ObjectCount).First();
+                var bestLog = reliableLogs.OrderByDescending(l => l.ObjectCount).First();
 
-            if (string.IsNullOrEmpty(bestLog.ImageBase64))
-            {
-                _logger.LogWarning("Best log found but it is missing image data. Skipping Gemini analysis.");
-                return;
-            }
+                if (string.IsNullOrEmpty(bestLog.ImageBase64))
+                {
+                    _logger.LogWarning("Best log found for user {UserId} but it is missing image data. Skipping Gemini analysis.", userLogGroup.Key);
+                    continue;
+                }
 
-            using (var scope = _serviceProvider.CreateScope())
-            {
-                var geminiService = scope.ServiceProvider.GetRequiredService<GeminiService>();
+                using (var scope = _serviceProvider.CreateScope())
+                {
+                    var geminiService = scope.ServiceProvider.GetRequiredService<GeminiService>();
 
-                var dummyDetections = bestLog.ObjectsDetected.Split(", ", StringSplitOptions.RemoveEmptyEntries)
-                                           .Select(name => new Detection { ClassName = name }).ToList();
+                    var dummyDetections = bestLog.ObjectsDetected.Split(", ", StringSplitOptions.RemoveEmptyEntries)
+                                                .Select(name => new Detection { ClassName = name }).ToList();
 
-                var imageBytes = Convert.FromBase64String(bestLog.ImageBase64);
+                    var imageBytes = Convert.FromBase64String(bestLog.ImageBase64);
 
-                _logger.LogInformation("Generating scene analysis for the best log using multimodal input...");
+                    _logger.LogInformation("Generating scene analysis for the best log (User: {UserId}) using multimodal input...", userLogGroup.Key);
 
-                bestLog.SceneDescription = await geminiService.GenerateSceneDescriptionAsync(imageBytes, dummyDetections, bestLog.ExtractedText);
+                    bestLog.SceneDescription = await geminiService.GenerateSceneDescriptionAsync(imageBytes, dummyDetections, bestLog.ExtractedText);
 
-                var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                dbContext.DetectionLogs.Add(bestLog);
-                await dbContext.SaveChangesAsync();
+                    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    dbContext.DetectionLogs.Add(bestLog);
+                    await dbContext.SaveChangesAsync();
 
-                _logger.LogInformation("Saved best log from batch to database. Detected {ObjectCount} objects.", bestLog.ObjectCount);
+                    _logger.LogInformation("Saved best log from batch to database for user {UserId}. Detected {ObjectCount} objects.", userLogGroup.Key, bestLog.ObjectCount);
+                }
             }
         }
     }

@@ -8,11 +8,13 @@ using System.Text;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Add services to the container.
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        policy.WithOrigins("http://127.0.0.1:44390")      
+        policy.WithOrigins("https://localhost:44390", "http://localhost:5173") // Example for dev
               .AllowAnyHeader()
               .AllowAnyMethod();
     });
@@ -42,22 +44,24 @@ builder.Services.AddControllers();
 builder.Services.AddSingleton<ApplicationStatusService>();
 builder.Services.AddSingleton<ObjectDetectionService>();
 builder.Services.AddSingleton<OCRService>();
-builder.Services.AddSingleton<GeminiService>();    
+builder.Services.AddSingleton<GeminiService>();
 builder.Services.AddSingleton<LogFileWriterService>();
+builder.Services.AddScoped<TokenService>(); // Add TokenService
 
 builder.Services.AddHostedService<LogProcessingWorker>();
 builder.Services.AddHostedService<ModelLoadingService>();
 
 var app = builder.Build();
 
-app.UseDefaultFiles();       
-app.UseStaticFiles();      
+// Configure the HTTP request pipeline.
+app.UseDefaultFiles();
+app.UseStaticFiles();
 
 app.UseHttpsRedirection();
 
 app.UseCors("AllowFrontend");
 
-app.UseAuthentication();
+app.UseAuthentication(); // Ensure this is before UseAuthorization
 app.UseAuthorization();
 
 app.MapControllers();

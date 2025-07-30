@@ -1,6 +1,8 @@
 ﻿using iVA.Models;
 using iVA.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace iVA.Controllers
@@ -12,6 +14,7 @@ namespace iVA.Controllers
 
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize] // Secure this controller
     public class VideoProcessingController : ControllerBase
     {
         private readonly ObjectDetectionService _detectionService;
@@ -36,6 +39,13 @@ namespace iVA.Controllers
                 return BadRequest("Image data is empty.");
             }
 
+            // Get user ID from the token claims
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier);
+            if (!int.TryParse(userIdString, out var userId))
+            {
+                return Unauthorized();
+            }
+
             var imageBytes = System.Convert.FromBase64String(frameData.ImageBase64);
 
             var detectionTask = _detectionService.DetectObjectsAsync(imageBytes);
@@ -52,7 +62,8 @@ namespace iVA.Controllers
                 ObjectCount = detections.Count,
                 ExtractedText = extractedText,
                 SceneDescription = null,
-                ImageBase64 = frameData.ImageBase64       
+                ImageBase64 = frameData.ImageBase64,
+                UserId = userId // Associate with the current user
             };
 
             await _logWriter.WriteLogAsync(log);

@@ -11,27 +11,156 @@
     const liveCameraContent = document.getElementById('liveCameraContent');
     const videoFileContent = document.getElementById('videoFileContent');
 
-    const cameraVideoFeed = document.getElementById('videoFeed');                     
+    const cameraVideoFeed = document.getElementById('videoFeed');
     const cameraCanvas = document.getElementById('canvas');
     const cameraPlayBtn = document.getElementById('playBtn');
     const cameraPauseBtn = document.getElementById('pauseBtn');
 
-    const videoFileFeed = document.getElementById('videoFeedAlt');                     
+    const videoFileFeed = document.getElementById('videoFeedAlt');
     const videoFileCanvas = document.getElementById('canvasAlt');
     const videoFileInput = document.getElementById('videoFileInput');
     const videoFilePlayBtn = document.getElementById('playVideoFileBtn');
     const videoFilePauseBtn = document.getElementById('pauseVideoFileBtn');
 
-    let currentActiveVideo = null;                                         
-    let currentActiveCanvas = null;                             
+    // Auth Elements
+    const authModal = document.getElementById('auth-modal');
+    const mainContent = document.getElementById('main-content');
+    const loginForm = document.getElementById('login-form');
+    const registerForm = document.getElementById('register-form');
+    const toggleAuthModeBtn = document.getElementById('toggle-auth-mode');
+    const authErrorMessage = document.getElementById('auth-error-message');
+    const logoutBtn = document.getElementById('logout-btn');
+    const userDisplay = document.getElementById('user-display');
+    const usernameDisplay = document.getElementById('username-display');
+
+    let currentActiveVideo = null;
+    let currentActiveCanvas = null;
     let processingIntervalId = null;
-    let currentCameraStream = null;             
+    let currentCameraStream = null;
     let activeTab = 'camera';
 
     const loadingOverlay = document.getElementById('loading-overlay');
 
     const PROCESS_API_URL = '/api/videoprocessing/process-frame';
     const LOGS_API_URL = '/api/logs';
+    const AUTH_LOGIN_URL = '/api/auth/login';
+    const AUTH_REGISTER_URL = '/api/auth/register';
+
+    // --- Auth State ---
+    let authToken = localStorage.getItem('authToken');
+    let username = localStorage.getItem('username');
+
+    const authenticatedFetch = async (url, options = {}) => {
+        const headers = {
+            'Content-Type': 'application/json',
+            ...options.headers,
+        };
+        if (authToken) {
+            headers['Authorization'] = `Bearer ${authToken}`;
+        }
+        const response = await fetch(url, { ...options, headers });
+        if (response.status === 401) {
+            logout();
+        }
+        return response;
+    };
+
+    function updateAuthState(token, uname) {
+        if (token && uname) {
+            authToken = token;
+            username = uname;
+            localStorage.setItem('authToken', token);
+            localStorage.setItem('username', uname);
+            authModal.classList.add('hidden');
+            mainContent.classList.remove('opacity-0');
+            userDisplay.classList.remove('hidden');
+            userDisplay.classList.add('flex');
+            usernameDisplay.textContent = `Welcome, ${username}`;
+            initialize();
+        } else {
+            authToken = null;
+            username = null;
+            localStorage.removeItem('authToken');
+            localStorage.removeItem('username');
+            authModal.classList.remove('hidden');
+            mainContent.classList.add('opacity-0');
+            userDisplay.classList.add('hidden');
+            stopAllVideoSources();
+        }
+    }
+
+    function logout() {
+        updateAuthState(null, null);
+    }
+
+    // --- Auth UI Logic ---
+    toggleAuthModeBtn.addEventListener('click', () => {
+        loginForm.classList.toggle('hidden');
+        registerForm.classList.toggle('hidden');
+        document.getElementById('auth-title').textContent = loginForm.classList.contains('hidden') ? 'Register' : 'Login';
+        document.getElementById('auth-subtitle').textContent = loginForm.classList.contains('hidden') ? 'Create a new iVA account.' : 'Welcome back to iVA.';
+        document.getElementById('login-prompt').classList.toggle('hidden');
+        document.getElementById('register-prompt').classList.toggle('hidden');
+        document.getElementById('toggle-to-register').classList.toggle('hidden');
+        document.getElementById('toggle-to-login').classList.toggle('hidden');
+        authErrorMessage.classList.add('hidden');
+    });
+
+    loginForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const uname = document.getElementById('login-username').value;
+        const password = document.getElementById('login-password').value;
+        try {
+            const response = await fetch(AUTH_LOGIN_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: uname, password })
+            });
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(errorData || 'Login failed');
+            }
+            const data = await response.json();
+            updateAuthState(data.token, uname);
+        } catch (error) {
+            authErrorMessage.textContent = error.message;
+            authErrorMessage.classList.remove('hidden');
+        }
+    });
+
+    registerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const uname = document.getElementById('register-username').value;
+        const password = document.getElementById('register-password').value;
+        try {
+            const response = await fetch(AUTH_REGISTER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: uname, password })
+            });
+            if (!response.ok) {
+                const errorData = await response.text();
+                throw new Error(errorData || 'Registration failed');
+            }
+            // Switch to login form after successful registration
+            toggleAuthModeBtn.click();
+            document.getElementById('login-username').value = uname;
+            document.getElementById('login-password').value = '';
+            authErrorMessage.textContent = 'Registration successful! Please log in.';
+            authErrorMessage.classList.remove('hidden');
+            authErrorMessage.classList.remove('bg-rose-500/20', 'text-rose-500');
+            authErrorMessage.classList.add('bg-green-500/20', 'text-green-500');
+
+        } catch (error) {
+            authErrorMessage.textContent = error.message;
+            authErrorMessage.classList.remove('hidden');
+            authErrorMessage.classList.remove('bg-green-500/20', 'text-green-500');
+            authErrorMessage.classList.add('bg-rose-500/20', 'text-rose-500');
+        }
+    });
+
+    logoutBtn.addEventListener('click', logout);
+
 
     const applyTheme = (theme) => {
         if (theme === 'dark') {
@@ -48,7 +177,7 @@
 
         if (activeTab === 'camera') {
             updateTabButtonStyles(liveCameraTabBtn, videoFileTabBtn, theme);
-        } else {             
+        } else {
             updateTabButtonStyles(videoFileTabBtn, liveCameraTabBtn, theme);
         }
 
@@ -77,9 +206,9 @@
         detections.forEach(det => {
             const { x, y, width, height } = det.boundingBox;
             const isDark = document.documentElement.classList.contains('dark');
-            const strokeColor = isDark ? '#2dd4bf' : '#0d9488';                         
-            const fillColor = isDark ? '#2dd4bf' : '#0d9488';                         
-            const textColor = '#ffffff';                                 
+            const strokeColor = isDark ? '#2dd4bf' : '#0d9488';
+            const fillColor = isDark ? '#2dd4bf' : '#0d9488';
+            const textColor = '#ffffff';
 
             ctx.strokeStyle = strokeColor;
             ctx.lineWidth = 2;
@@ -98,6 +227,7 @@
 
     async function processFrame() {
         if (!currentActiveVideo || currentActiveVideo.paused || currentActiveVideo.readyState < currentActiveVideo.HAVE_CURRENT_DATA) return;
+        if (!authToken) return; // Don't process if not logged in
 
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = currentActiveVideo.videoWidth;
@@ -107,9 +237,8 @@
         const imageBase64 = tempCanvas.toDataURL('image/jpeg').split(',')[1];
 
         try {
-            const response = await fetch(PROCESS_API_URL, {
+            const response = await authenticatedFetch(PROCESS_API_URL, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ imageBase64 })
             });
             if (!response.ok) return;
@@ -181,8 +310,9 @@
     }
 
     async function fetchAndRenderLogs() {
+        if (!authToken) return; // Don't fetch if not logged in
         try {
-            const response = await fetch(LOGS_API_URL);
+            const response = await authenticatedFetch(LOGS_API_URL);
             if (!response.ok) return;
             const logs = await response.json();
 
@@ -212,7 +342,7 @@
     }
 
     function stopAllVideoSources() {
-        stopProcessing();                     
+        stopProcessing();
 
         if (currentCameraStream) {
             currentCameraStream.getTracks().forEach(track => track.stop());
@@ -236,7 +366,7 @@
     }
 
     function startProcessing() {
-        if (processingIntervalId) return;         
+        if (processingIntervalId) return;
 
         if (!currentActiveVideo) {
             console.warn("No video source (camera or file) available to start processing.");
@@ -256,17 +386,17 @@
         if (activeTab === 'camera') {
             cameraPlayBtn.classList.add('opacity-50', 'cursor-not-allowed');
             cameraPauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
-        } else {             
+        } else {
             videoFilePlayBtn.classList.add('opacity-50', 'cursor-not-allowed');
             videoFilePauseBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         }
 
         fetchAndRenderLogs();
-        setInterval(fetchAndRenderLogs, 5000);             
+        setInterval(fetchAndRenderLogs, 5000);
     }
 
     function stopProcessing() {
-        if (!processingIntervalId) return;         
+        if (!processingIntervalId) return;
 
         if (currentActiveVideo) {
             currentActiveVideo.pause();
@@ -277,7 +407,7 @@
         if (activeTab === 'camera') {
             cameraPlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             cameraPauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
-        } else {             
+        } else {
             videoFilePlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
             videoFilePauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
         }
@@ -317,13 +447,13 @@
     }
 
     function prepareVideoFile() {
-        stopAllVideoSources();                 
+        stopAllVideoSources();
         currentActiveVideo = videoFileFeed;
         currentActiveCanvas = videoFileCanvas;
         activeTab = 'videoFile';
         videoFilePlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         videoFilePauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
-        cameraPlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');                         
+        cameraPlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');
         cameraPauseBtn.classList.add('opacity-50', 'cursor-not-allowed');
         console.log("Prepared for video file input.");
     }
@@ -331,18 +461,18 @@
     videoFileInput.addEventListener('change', (event) => {
         const file = event.target.files[0];
         if (file) {
-            stopProcessing();                 
-            stopAllVideoSources();                             
+            stopProcessing();
+            stopAllVideoSources();
 
             currentActiveVideo = videoFileFeed;
             currentActiveCanvas = videoFileCanvas;
-            activeTab = 'videoFile';                         
+            activeTab = 'videoFile';
 
             const fileURL = URL.createObjectURL(file);
             videoFileFeed.src = fileURL;
-            videoFileFeed.loop = true;                         
-            videoFileFeed.muted = true;                             
-            videoFileFeed.load();             
+            videoFileFeed.loop = true;
+            videoFileFeed.muted = true;
+            videoFileFeed.load();
 
             videoFileFeed.onloadeddata = () => {
                 console.log("Video file loaded into videoFileFeed:", file.name);
@@ -373,49 +503,49 @@
     function updateTabButtonStyles(activeBtn, inactiveBtn, currentTheme) {
         [activeBtn, inactiveBtn].forEach(btn => {
             btn.classList.remove('bg-teal-500', 'text-white', 'shadow-md',
-                'bg-teal-600',             
+                'bg-teal-600',
                 'text-gray-700', 'hover:bg-teal-50',
                 'text-gray-300', 'hover:bg-slate-700');
         });
 
         activeBtn.classList.add('bg-teal-500', 'text-white', 'shadow-md');
         if (currentTheme === 'dark') {
-            activeBtn.classList.remove('bg-teal-500');                 
-            activeBtn.classList.add('bg-teal-600');                         
+            activeBtn.classList.remove('bg-teal-500');
+            activeBtn.classList.add('bg-teal-600');
         }
 
         inactiveBtn.classList.add('text-gray-700', 'hover:bg-teal-50');
         if (currentTheme === 'dark') {
-            inactiveBtn.classList.remove('text-gray-700', 'hover:bg-teal-50');                 
-            inactiveBtn.classList.add('text-gray-300', 'hover:bg-slate-700');             
+            inactiveBtn.classList.remove('text-gray-700', 'hover:bg-teal-50');
+            inactiveBtn.classList.add('text-gray-300', 'hover:bg-slate-700');
         }
     }
 
 
     liveCameraTabBtn.addEventListener('click', () => {
         if (activeTab === 'camera') return;
-        stopProcessing();             
-        stopAllVideoSources();             
+        stopProcessing();
+        stopAllVideoSources();
         liveCameraContent.classList.remove('hidden');
         videoFileContent.classList.add('hidden');
 
         updateTabButtonStyles(liveCameraTabBtn, videoFileTabBtn, localStorage.getItem('theme') || 'light');
 
-        initializeCamera();                     
+        initializeCamera();
         objectsEl.textContent = 'Ready for camera feed.';
         textEl.textContent = 'Ready for camera feed.';
     });
 
     videoFileTabBtn.addEventListener('click', () => {
         if (activeTab === 'videoFile') return;
-        stopProcessing();             
-        stopAllVideoSources();             
+        stopProcessing();
+        stopAllVideoSources();
         videoFileContent.classList.remove('hidden');
         liveCameraContent.classList.add('hidden');
 
         updateTabButtonStyles(videoFileTabBtn, liveCameraTabBtn, localStorage.getItem('theme') || 'light');
 
-        prepareVideoFile();                             
+        prepareVideoFile();
         objectsEl.textContent = 'Select a video file.';
         textEl.textContent = 'Select a video file.';
     });
@@ -426,7 +556,8 @@
     videoFilePauseBtn.addEventListener('click', stopProcessing);
 
 
-    async function initialize() {                              
+    async function initialize() {
+        if (!authToken) return;
         await fetchAndRenderLogs();
 
         liveCameraTabBtn.click();
@@ -442,18 +573,19 @@
 
                 if (response.ok) {
                     console.log("Backend is ready. Hiding loader.");
-                    clearInterval(statusInterval);         
+                    clearInterval(statusInterval);
 
                     loadingOverlay.classList.add('fade-out');
                     setTimeout(() => {
                         loadingOverlay.style.display = 'none';
-                        initialize();                     
-                    }, 500);                     
+                        // Check auth state after backend is ready
+                        updateAuthState(authToken, username);
+                    }, 500);
                 }
             } catch (error) {
                 console.log("Backend not reachable yet, retrying...");
             }
-        }, 2000);                 
+        }, 2000);
     }
 
     checkBackendStatus();
