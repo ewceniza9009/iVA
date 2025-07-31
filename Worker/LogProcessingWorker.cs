@@ -94,11 +94,15 @@ namespace iVA.Workers
                         _logger.LogInformation("Generating scene analysis for the best log (User: {UserId}) using multimodal input...", userLogGroup.Key);
 
                         bestLog.SceneDescription = await geminiService.GenerateSceneDescriptionAsync(imageBytes, dummyDetections, bestLog.ExtractedText);
-                    }                    
+                    }
 
-                    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                    dbContext.DetectionLogs.Add(bestLog);
-                    await dbContext.SaveChangesAsync();
+                    //Disable logging to databse for object detection testing
+                    if (_appService.IsEnableLog) 
+                    {
+                        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        dbContext.DetectionLogs.Add(bestLog);
+                        await dbContext.SaveChangesAsync();
+                    }
 
                     _logger.LogInformation("Saved best log from batch to database for user {UserId}. Detected {ObjectCount} objects.", userLogGroup.Key, bestLog.ObjectCount);
                 }
