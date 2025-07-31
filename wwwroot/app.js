@@ -34,13 +34,13 @@
 
     let currentActiveVideo = null;
     let currentActiveCanvas = null;
-    let processingIntervalId = null;
+    let isProcessing = false;
     let currentCameraStream = null;
     let activeTab = 'camera';
+    let signalRConnection = null;
 
     const loadingOverlay = document.getElementById('loading-overlay');
 
-    const PROCESS_API_URL = '/api/videoprocessing/process-frame';
     const LOGS_API_URL = '/api/logs';
     const AUTH_LOGIN_URL = '/api/auth/login';
     const AUTH_REGISTER_URL = '/api/auth/register';
@@ -85,6 +85,57 @@
         return response;
     };
 
+    function setupSignalR() {
+        if (signalRConnection) return;
+
+        signalRConnection = new signalR.HubConnectionBuilder()
+            .withUrl("/VideoProcessingHub", {
+                accessTokenFactory: () => authToken
+            })
+            .withAutomaticReconnect()
+            .build();
+
+        // This is where we receive results from the server
+        signalRConnection.on("ReceiveProcessingResult", (result) => {
+            if (!result) return;
+            const objectCountsMap = {};
+            if (result.detections && result.detections.length > 0) {
+                result.detections.forEach(det => {
+                    const className = det.className;
+                    objectCountsMap[className] = (objectCountsMap[className] || 0) + 1;
+                });
+
+                const formattedCounts = Object.entries(objectCountsMap)
+                    .map(([className, count]) => `${count} ${className}${count > 1 ? 's' : ''}`)
+                    .join(', ');
+                objectsEl.textContent = formattedCounts;
+            } else {
+                objectsEl.textContent = 'No objects detected.';
+            }
+
+            textEl.textContent = result.extractedText || 'No text detected.';
+            drawBoundingBoxes(result.detections);
+        });
+
+        async function startConnection() {
+            try {
+                await signalRConnection.start();
+                console.log("SignalR Connected.");
+            } catch (err) {
+                console.error("SignalR Connection Error: ", err);
+                setTimeout(startConnection, 5000);
+            }
+        }
+
+        signalRConnection.onclose(async () => {
+            console.log("SignalR connection closed. Attempting to restart...");
+            await startConnection();
+        });
+
+        startConnection();
+    }
+
+
     function updateAuthState(token, uname) {
         if (token && uname) {
             authToken = token;
@@ -96,6 +147,7 @@
             userDisplay.classList.remove('hidden');
             userDisplay.classList.add('flex');
             usernameDisplay.textContent = `Welcome, ${username}`;
+            setupSignalR(); // Setup and start SignalR connection
             initialize();
         } else {
             authToken = null;
@@ -105,6 +157,10 @@
             authModal.classList.remove('hidden');
             mainContent.classList.add('opacity-0');
             userDisplay.classList.add('hidden');
+            if (signalRConnection) {
+                signalRConnection.stop();
+                signalRConnection = null;
+            }
             stopAllVideoSources();
         }
     }
@@ -244,8 +300,9 @@
     }
 
     async function processFrame() {
+        if (signalRConnection?.state !== 'Connected') return;
         if (!currentActiveVideo || currentActiveVideo.paused || currentActiveVideo.readyState < currentActiveVideo.HAVE_CURRENT_DATA) return;
-        if (!authToken) return;                         
+        if (!authToken) return;
 
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = currentActiveVideo.videoWidth;
@@ -255,35 +312,31 @@
         const imageBase64 = tempCanvas.toDataURL('image/jpeg').split(',')[1];
 
         try {
-            const response = await authenticatedFetch(PROCESS_API_URL, {
-                method: 'POST',
-                body: JSON.stringify({ imageBase64 })
-            });
-            if (!response.ok) return;
-
-            const result = await response.json();
-
-            const objectCountsMap = {};
-            if (result.detections && result.detections.length > 0) {
-                result.detections.forEach(det => {
-                    const className = det.className;
-                    objectCountsMap[className] = (objectCountsMap[className] || 0) + 1;
-                });
-
-                const formattedCounts = Object.entries(objectCountsMap)
-                    .map(([className, count]) => `${count} ${className}${count > 1 ? 's' : ''}`)
-                    .join(', ');
-                objectsEl.textContent = formattedCounts;
-            } else {
-                objectsEl.textContent = 'No objects detected.';
-            }
-
-            textEl.textContent = result.extractedText || 'No text detected.';
-            drawBoundingBoxes(result.detections);
+            // REMOVE "await" from the line below
+            signalRConnection.invoke("ProcessFrame", imageBase64);
         } catch (error) {
-            console.error('Failed to process frame:', error);
+            console.error('Failed to send frame via SignalR:', error);
         }
     }
+
+    // New high-performance processing loop
+    let lastFrameSendTime = 0;
+    const frameSendInterval = 750; // ms, for ~4 FPS. Adjust as needed.
+
+    function processingLoop(timestamp) {
+        if (!isProcessing) return; // Stop the loop if not processing
+
+        requestAnimationFrame(processingLoop); // Request the next frame
+
+        const elapsed = timestamp - lastFrameSendTime;
+
+        // Throttle the frame sending to the specified interval
+        if (elapsed > frameSendInterval) {
+            lastFrameSendTime = timestamp;
+            processFrame();
+        }
+    }
+
 
     function markdownToHtml(markdownText) {
         if (!markdownText) return '';
@@ -313,7 +366,7 @@
         }
 
         const fullDescription = log.sceneDescription || '';
-        const parts = fullDescription.split(/\n\s*\n/);                                     
+        const parts = fullDescription.split(/\n\s*\n/);
         const summaryText = parts[0] || '';
         const detailText = parts.length > 1 ? parts.slice(1).join('\n\n') : '';
 
@@ -352,7 +405,7 @@
     }
 
     async function fetchAndRenderLogs() {
-        if (!authToken) return;                         
+        if (!authToken) return;
         try {
             const response = await authenticatedFetch(LOGS_API_URL);
             if (!response.ok) return;
@@ -408,7 +461,7 @@
     }
 
     function startProcessing() {
-        if (processingIntervalId) return;
+        if (isProcessing) return;
 
         if (!currentActiveVideo) {
             console.warn("No video source (camera or file) available to start processing.");
@@ -423,7 +476,8 @@
             textEl.textContent = 'Autoplay blocked. Click play again.';
         });
 
-        processingIntervalId = setInterval(processFrame, 500);
+        isProcessing = true;
+        requestAnimationFrame(processingLoop); // Start the new loop
 
         if (activeTab === 'camera') {
             cameraPlayBtn.classList.add('opacity-50', 'cursor-not-allowed');
@@ -434,17 +488,16 @@
         }
 
         fetchAndRenderLogs();
-        setInterval(fetchAndRenderLogs, 5000);
+        setInterval(fetchAndRenderLogs, 5000); // Keep fetching logs periodically
     }
 
     function stopProcessing() {
-        if (!processingIntervalId) return;
+        if (!isProcessing) return;
 
+        isProcessing = false; // This will stop the animation loop
         if (currentActiveVideo) {
             currentActiveVideo.pause();
         }
-        clearInterval(processingIntervalId);
-        processingIntervalId = null;
 
         if (activeTab === 'camera') {
             cameraPlayBtn.classList.remove('opacity-50', 'cursor-not-allowed');

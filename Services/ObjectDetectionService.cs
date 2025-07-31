@@ -46,7 +46,14 @@ namespace iVA.Services
 
         public ObjectDetectionService()
         {
-            _session = new InferenceSession(AppContext.BaseDirectory + "/nets/object_detector.onnx");
+            var sessionOptions = new Microsoft.ML.OnnxRuntime.SessionOptions
+            {
+                GraphOptimizationLevel = GraphOptimizationLevel.ORT_ENABLE_ALL
+            };
+
+            _session = new InferenceSession(
+                AppContext.BaseDirectory + "/nets/object_detector.onnx",
+                sessionOptions);
         }
 
         public Task<List<Detection>> DetectObjectsAsync(byte[] imageBytes)

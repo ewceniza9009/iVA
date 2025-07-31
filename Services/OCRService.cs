@@ -1,6 +1,7 @@
-﻿using Tesseract;
+﻿using OpenCvSharp;
 using System;
 using System.Threading.Tasks;
+using Tesseract;
 
 namespace iVA.Services
 {
@@ -18,6 +19,10 @@ namespace iVA.Services
         {
             lock (_engineLock)
             {
+                using var mat = Cv2.ImDecode(imageBytes, ImreadModes.Grayscale);
+                Cv2.Threshold(mat, mat, 0, 255, ThresholdTypes.Binary | ThresholdTypes.Otsu);
+
+                Cv2.ImEncode(".png", mat, out byte[] processedImageBytes);
                 using var pix = Pix.LoadFromMemory(imageBytes);
                 using var page = _engine.Process(pix);
                 var text = page.GetText().Trim();
