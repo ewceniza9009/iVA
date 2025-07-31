@@ -365,3 +365,4 @@ FodyWeavers.xsd
 /tessdata/eng.traineddata
 /nets/yolov8n.onnx
 /nets/object_detector.onnx
+/Services/ApplicationStatusService.cs
